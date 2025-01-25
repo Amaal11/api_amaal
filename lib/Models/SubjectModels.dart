@@ -1,3 +1,5 @@
+import 'package:get/state_manager.dart';
+
 class SubjectModel {
   final String title;
   final String slug;

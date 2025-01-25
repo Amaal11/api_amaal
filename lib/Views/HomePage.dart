@@ -1,10 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:amaalmubarak/Config/constants.dart';
 import 'package:amaalmubarak/Controllers/HomeController.dart';
+import 'package:amaalmubarak/Controllers/LoginController.dart';
 import 'package:amaalmubarak/Themes/Colors.dart';
 import 'package:get/get.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:amaalmubarak/Controllers/LoginController.dart';
 import 'CoursePage.dart';
 
 class HomePage extends StatelessWidget {
@@ -27,7 +27,7 @@ class HomePage extends StatelessWidget {
           }, icon: Icon(Icons.logout)),
           IconButton(onPressed: (){
             Get.to(()=>CoursesPage());
-          }, icon: Icon(Icons.plus_one,color: Colors.white,))
+          }, icon: Icon(Icons.add))
         ],
         centerTitle: true,
         backgroundColor: primaryColor,
@@ -93,11 +93,8 @@ class HomePage extends StatelessWidget {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(15),
                       onTap: () {
-                        // Navigate to CoursesPage with the subject ID
-                        print(subject.title);
-                        Get.to(
-                            CoursesPage(subjectId: subject.title,)
-                        );
+                        // Move to Course Page
+                        Get.to(CoursesPage());
                       },
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -107,11 +104,10 @@ class HomePage extends StatelessWidget {
                               borderRadius: BorderRadius.circular(10),
                               child:CachedNetworkImage(
                                 imageUrl: baseURL + subject.photo,
-                                fit: BoxFit.cover,
                                 placeholder: (context, url) => CircularProgressIndicator(),
                                 errorWidget: (context, url, error) => Icon(Icons.error),
-                                height: 60,
-                                width: 60,
+                                height: 100,
+                                width: 100,
                               ),
                               //
                               // Image.network(
@@ -176,5 +172,4 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
-
 }

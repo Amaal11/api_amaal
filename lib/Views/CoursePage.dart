@@ -1,6 +1,6 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:amaalmubarak/Config/constants.dart';
+import 'package:amaalmubarak/Models/SubjectModels.dart';
 import 'package:amaalmubarak/Views/CourseDetailsPage.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,22 +8,10 @@ import 'dart:io';
 import '../Controllers/CourseController.dart';
 import '../Controllers/HomeController.dart';
 import '../Models/CourseModel.dart';
-import '../Themes/Colors.dart';
+import 'package:amaalmubarak/Themes/Colors.dart';
 
 class CoursesPage extends StatelessWidget {
   final CourseController _controller = Get.put(CourseController());
-  String? subjectId; // Make it a final field (not late)
-
-  // Constructor to accept subjectId
-  CoursesPage({Key? key, this.subjectId}) : super(key: key) {
-    print("CoursesPage constructor - subjectId: $subjectId"); // Debug print
-    if (subjectId == null) {
-      final arguments = Get.arguments;
-      print("Arguments: $arguments"); // Debug print
-      subjectId = arguments != null ? arguments["subjectId"] : null;
-      print("Retrieved subjectId from arguments: $subjectId"); // Debug print
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +24,11 @@ class CoursesPage extends StatelessWidget {
             color: textColor,
           ),
         ),
+        actions: [
+          IconButton(onPressed: (){
+            _controller.getCourseList();
+          }, icon: Icon(Icons.refresh))
+        ],
         centerTitle: true,
         backgroundColor: primaryColor,
         elevation: 10,
@@ -58,13 +51,8 @@ class CoursesPage extends StatelessWidget {
               ),
             );
           }
-          // Filter the course list based on the subject ID
-          final filteredCourses = subjectId != null
-              ? _controller.courseList
-              .where((course) => course.subject == subjectId)
-              .toList()
-              : _controller.courseList;
-          if (filteredCourses.isEmpty) {
+
+          if (_controller.courseList.isEmpty) {
             return const Center(
               child: Text(
                 "No course available.",
@@ -83,9 +71,9 @@ class CoursesPage extends StatelessWidget {
             },
             child: ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: filteredCourses.length,
+              itemCount: _controller.courseList.length,
               itemBuilder: (context, index) {
-                final course = filteredCourses[index];
+                final course = _controller.courseList[index];
                 return AnimatedOpacity(
                   opacity: _controller.isLoading.value ? 0 : 1,
                   duration: const Duration(milliseconds: 500),
@@ -105,37 +93,29 @@ class CoursesPage extends StatelessWidget {
                         child: Row(
                           children: [
                             Material(
-                              elevation: 10,
-                              borderRadius: BorderRadius.only(topRight: Radius.circular(20)),
+                              elevation: 2,
+                              borderRadius: BorderRadius.circular(8),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child:CachedNetworkImage(
-                                  imageUrl: "${baseURL + course.photo!}",
-                                  fit: BoxFit.cover,
-                                  placeholder: (context, url) => CircularProgressIndicator(),
-                                  errorWidget: (context, url, error) => Icon(Icons.error),
-                                  height: 60,
+                                child: Image.file(
+                                  File(course.photo!),
                                   width: 60,
-                                )
-                                // Image.network(
-                                //   "${baseURL + course.photo!}",
-                                //   width: 60,
-                                //   height: 60,
-                                //   fit: BoxFit.cover,
-                                //   errorBuilder: (context, error, stackTrace) {
-                                //     return Container(
-                                //       width: 60,
-                                //       height: 60,
-                                //       decoration: BoxDecoration(
-                                //         borderRadius: BorderRadius.circular(10),
-                                //       ),
-                                //       child: const Icon(
-                                //         Icons.image_not_supported_rounded,
-                                //         color: primaryColor,
-                                //       ),
-                                //     );
-                                //   },
-                                // ),
+                                  height: 60,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      width: 60,
+                                      height: 60,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: const Icon(
+                                        Icons.image_not_supported_rounded,
+                                        color: primaryColor,
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                             const SizedBox(width: 16),
@@ -217,7 +197,9 @@ class CoursesPage extends StatelessWidget {
     var subjects = Get.find<HomeController>().subjects;
     final _formKey = GlobalKey<FormState>();
     Rx<File?> courseImage = Rx<File?>(null);
-
+    if(subjects.length<=0){
+      subjects.add(SubjectModel(title: 'Flutter', slug: 'Programming', photo: '', totalCourses: 1));
+    }
     var titleController = TextEditingController();
     var overviewController = TextEditingController();
     String selectedSubject = subjects.first.slug;
@@ -225,9 +207,22 @@ class CoursesPage extends StatelessWidget {
     if (course != null) {
       titleController.text = course.title;
       overviewController.text = course.overview;
-      selectedSubject = subjects
-          .firstWhere((element) => element.title == course.subject)
-          .slug;
+      if(subjects.length<=0){
+        subjects.add(SubjectModel(title: 'Flutter', slug: 'Programming', photo: '', totalCourses: 1));
+      }else{
+
+        selectedSubject = subjects
+            .firstWhere(
+              (element) => element.title == course.subject,
+          orElse: () =>subjects.first, // Fallback subject
+        )
+            .slug;
+        if(selectedSubject==null){
+          selectedSubject=subjects.first.slug;
+        }
+        print(selectedSubject);
+      }
+
     }
 
     Future<void> _pickImage() async {

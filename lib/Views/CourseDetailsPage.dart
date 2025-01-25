@@ -4,7 +4,7 @@ import 'package:get/get.dart';
 
 import '../Controllers/CourseController.dart';
 import '../Models/CourseModel.dart';
-import '../Themes/Colors.dart';
+import 'package:amaalmubarak/Themes/Colors.dart';
 
 
 class CourseDetailsPage extends StatelessWidget {

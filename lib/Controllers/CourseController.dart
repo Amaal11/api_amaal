@@ -1,13 +1,15 @@
 import 'dart:io';
 import 'package:amaalmubarak/Config/constants.dart';
 import 'package:get/get.dart';
-import 'package:dio/dio.dart' as dio;
-import 'package:amaalmubarak/APIServices/DynamicApiServices.dart';
+
+import '../Helpers/SQliteDbHelper.dart';
+import '../Models/CourseModel.dart';
 import 'package:amaalmubarak/Helpers/NetworkHelper.dart';
-import 'package:amaalmubarak/Models/CourseModel.dart';
+import 'package:amaalmubarak/APIServices/DioClient.dart';
+import 'package:amaalmubarak/APIServices/DynamicApiServices.dart';
 
 class CourseController extends GetxController {
-  final ApiService _apiService = ApiService();
+  final DatabaseHelper _databaseHelper = DatabaseHelper();
   var courseList = <CourseModel>[].obs;
   CourseModel? courseDetail;
   var isLoading = true.obs;
@@ -22,30 +24,13 @@ class CourseController extends GetxController {
     try {
       isLoading(true);
 
-      // Check internet connectivity
-      final isConnected = await NetworkHelper.isConnected();
 
-      if (isConnected) {
-        // Fetch data from the API
-        final response = await _apiService.get(baseAPIURLV1 + teachersAPI);
-        if (response.statusCode == 200) {
-          final apiCourses = (response.data as List)
-              .map((json) => CourseModel.fromJson(json))
-              .toList();
+      // Fetch data from the local database
+      final localCourses = await _databaseHelper.getCourses();
+      courseList.value = localCourses;
+      Get.snackbar("Info", "No internet connection. Showing local data.",
+          snackPosition: SnackPosition.BOTTOM);
 
-
-
-          // Update the UI with the latest data
-          courseList.value = apiCourses;
-        } else {
-          Get.snackbar("Error", "Failed to fetch courses from API",
-              snackPosition: SnackPosition.BOTTOM);
-        }
-      } else {
-
-        Get.snackbar("Info", "No internet connection. Showing local data.",
-            snackPosition: SnackPosition.BOTTOM);
-      }
     } catch (e) {
       Get.snackbar("Error", "Failed to fetch courses: $e",
           snackPosition: SnackPosition.BOTTOM);
@@ -59,19 +44,11 @@ class CourseController extends GetxController {
     try {
       isLoading(true);
 
-      // Check internet connectivity
-      final isConnected = await NetworkHelper.isConnected();
 
-      if (isConnected) {
-        // Fetch data from the API
-        final response = await _apiService.get("${baseAPIURLV1 + teachersAPI}$courseId/");
-        if (response.statusCode == 200) {
-          courseDetail = CourseModel.fromJson(response.data);
-        }
-      } else {
-        Get.snackbar("Info", "No internet connection. Showing local data.",
-            snackPosition: SnackPosition.BOTTOM);
-      }
+      // Fetch data from the local database
+      final localCourses = await _databaseHelper.getCourses();
+      courseDetail = localCourses.firstWhere((course) => course.id == courseId);
+
     } catch (e) {
       Get.snackbar("Error", "Failed to fetch course details: $e",
           snackPosition: SnackPosition.BOTTOM);
@@ -86,49 +63,29 @@ class CourseController extends GetxController {
     required String subject,
     File? photo,
   }) async {
-    var data;
-    dio.Options options =
-    dio.Options(headers: {'Content-Type': 'application/json'});
+
     try {
       isLoading(true);
 
-
-      // Check internet connectivity
-      final isConnected = await NetworkHelper.isConnected();
-
-      if (isConnected) {
-        // Sync with the API
-        if (photo != null) {
-          data = dio.FormData.fromMap({
-            "subject": subject,
-            "title": title,
-            "overview": overview,
-            "photo": dio.MultipartFile.fromFileSync(
-              photo.path,
-              filename: photo.path.split(Platform.pathSeparator).last,
-            ),
-          });
-          options = dio.Options(headers: {'Content-Type': 'multipart/form-data'});
-        } else {
-          data = dio.FormData.fromMap({
-            "subject": subject,
-            "title": title,
-            "overview": overview,
-          });
-        }
-
-        final response = await _apiService.post(baseAPIURLV1 + teachersAPI + addAPI,
-            data: data, options: options);
-        if (response.statusCode == 201) {
-          // Mark the course as synced in the local database
-          Get.snackbar('Success', 'Course added successfully');
-        } else {
-          Get.snackbar('Error', response.data['error']);
-        }
+      // Add to local database first
+      final newCourse = CourseModel(
+        id: DateTime.now().millisecondsSinceEpoch, // Temporary ID
+        title: title,
+        subject: subject,
+        overview: overview,
+        photo: photo?.path ?? '',
+        createdAt: DateTime.now().toIso8601String(), // Add current timestamp
+      );
+      await _databaseHelper.insertCourse(newCourse);
+      if (await isConnected()) {
+        await _addCourseToApi(newCourse);
       } else {
+
+
+
         Get.snackbar('Info', 'Course saved locally. Sync with API when online.',
-            snackPosition: SnackPosition.BOTTOM);
-      }
+            snackPosition: SnackPosition.BOTTOM);}
+
     } catch (e) {
       Get.snackbar('Error', 'Failed to add course: $e');
     } finally {
@@ -145,54 +102,28 @@ class CourseController extends GetxController {
         required String subject,
         File? photo,
       }) async {
-    var data;
-    dio.Options options = dio.Options(
-      headers: {'method': 'PUT', 'Content-Type': 'application/json'},
-    );
+
     try {
       isLoading(true);
 
-      // Check internet connectivity
-      final isConnected = await NetworkHelper.isConnected();
-
-      if (isConnected) {
-        // Sync with the API
-        if (photo != null) {
-          data = dio.FormData.fromMap({
-            "subject": subject,
-            "title": title,
-            "overview": overview,
-            "photo": dio.MultipartFile.fromFileSync(
-              photo.path,
-              filename: photo.path.split(Platform.pathSeparator).last,
-            ),
-          });
-          options = dio.Options(
-            headers: {'method': 'PUT', 'Content-Type': 'multipart/form-data'},
-          );
-        } else {
-          data = dio.FormData.fromMap({
-            "subject": subject,
-            "title": title,
-            "overview": overview,
-          });
-        }
-
-        final response = await _apiService.put(
-            '${baseAPIURLV1 + teachersAPI}$courseId/$updateAPI/',
-            data: data,
-            options: options);
-        if (response.statusCode == 200) {
-
-          Get.snackbar('Success', 'Course updated successfully');
-          Get.back();
-        } else {
-          Get.snackbar('Error', response.data['error']);
-        }
+      // Update local database first
+      final updatedCourse = CourseModel(
+        id: courseId,
+        title: title,
+        subject: subject,
+        overview: overview,
+        photo: photo?.path ?? '',
+        createdAt: DateTime.now().toIso8601String(), // Update timestamp
+      );
+      await _databaseHelper.updateCourse(updatedCourse);
+      if (await isConnected()) {
+        await _updateCourseOnApi(updatedCourse);
       } else {
+
+
         Get.snackbar('Info', 'Course updated locally. Sync with API when online.',
-            snackPosition: SnackPosition.BOTTOM);
-      }
+            snackPosition: SnackPosition.BOTTOM);}
+
     } catch (e) {
       Get.snackbar('Error', 'Failed to update course: $e');
     } finally {
@@ -201,35 +132,113 @@ class CourseController extends GetxController {
 
     getCourseList();
   }
+  Future<void> _updateCourseOnApi(CourseModel course) async {
+    try {
+      DioClient _client = DioClient();
+      final response = await _client.dio.put(
+        updateAPI,  // Assuming the API supports PUT for update with course ID
+        data: course.toJson(),
+      );
+
+      if (response.statusCode == 200) {
+        Get.snackbar("Info", "Course synced with API.");
+      } else {
+        Get.snackbar("Error", "Failed to sync with API.");
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Error during sync: $e");
+    }
+  }
 
   void deleteCourse(int courseId) async {
     try {
       isLoading(true);
 
-
-
-      // Check internet connectivity
-      final isConnected = await NetworkHelper.isConnected();
-
-      if (isConnected) {
-        // Sync with the API
-        final response =
-        await _apiService.delete('${baseAPIURLV1 + teachersAPI}$courseId/$deleteAPI/');
-        if (response.statusCode == 204) {
-          Get.snackbar('Success', 'Course deleted successfully');
-          Get.back();
-        } else {
-          Get.snackbar('Error', response.data['error']);
-        }
+      // Delete from local database first
+      await _databaseHelper.deleteCourse(courseId);
+      if (await isConnected()) {
+        await _deleteCourseFromApi(courseId);
       } else {
+
+
+
+        // Check internet connectivity
+
         Get.snackbar('Info', 'Course deleted locally. Sync with API when online.',
-            snackPosition: SnackPosition.BOTTOM);
-      }
+            snackPosition: SnackPosition.BOTTOM);}
+
     } catch (e) {
       Get.snackbar('Error', 'Failed to delete course: $e');
     } finally {
       isLoading(false);
     }
     getCourseList();
+  }
+}
+Future<void> _deleteCourseFromApi(int courseId) async {
+  try {
+    DioClient _client = DioClient();
+    final response = await _client.dio.delete(
+      deleteAPI,  // Assuming the API supports DELETE with course ID
+    );
+
+    if (response.statusCode == 200) {
+      Get.snackbar("Info", "Course deleted from API.");
+    } else {
+      Get.snackbar("Error", "Failed to sync deletion with API.");
+    }
+  } catch (e) {
+    Get.snackbar("Error", "Error during sync: $e");
+  }
+}
+Future<void> _addCourseToApi(CourseModel course) async {
+  try {
+    DioClient _client = DioClient();
+    final response = await _client.dio.post(
+      teachersAPI, // استبدل بـ URL الخاص بك
+      data: course.toJson(),
+    );
+
+    if (response.statusCode == 200) {
+      Get.snackbar("Info", "Course synced with API.");
+    } else {
+      Get.snackbar("Error", "Failed to sync with API.");
+    }
+  } catch (e) {
+    Get.snackbar("Error", "Error during sync: $e");
+  }
+}
+/* Future<void> _addCourseToApi(CourseModel course) async {
+    try {
+      final response = await http.post(
+        Uri.parse("https://example.com/api/courses"),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode(course.toJson()),
+      );
+
+      if (response.statusCode == 200) {
+        Get.snackbar("Info", "Course synced with API.");
+      } else {
+        Get.snackbar("Error", "Failed to sync with API.");
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Error during sync: $e");
+    }
+  }
+
+Future<bool> isConnected() async {
+  try {
+    final result = await InternetAddress.lookup('example.com'); // تحقق من الاتصال
+    return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+  } catch (_) {
+    return false;  // في حالة عدم وجود اتصال بالإنترنت
+  }
+}*/
+Future<bool> isConnected() async {
+  try {
+    final result = await InternetAddress.lookup(''); // تحقق من الاتصال
+    return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+  } catch (_) {
+    return false;  // في حالة عدم وجود اتصال بالإنترنت
   }
 }

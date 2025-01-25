@@ -1,20 +1,14 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:amaalmubarak/APIServices/DioClient.dart';
 import 'package:amaalmubarak/Config/constants.dart';
-import 'package:get/get.dart';
-import 'package:dio/dio.dart';
-import '../Models/SubjectModels.dart';
-
-
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:amaalmubarak/Helpers/NetworkHelper.dart';
 import 'package:get/get.dart';
 import 'package:dio/dio.dart';
 import '../Models/SubjectModels.dart';
 
-
 class HomeController extends GetxController {
   var subjects = <SubjectModel>[].obs; // Observable list of subjects
-  RxBool isLoading = true.obs; // Loading state
+  var isLoading = true.obs; // Loading state
   var isRefreshing = false.obs; // Refresh state
 
   final DioClient _dio = DioClient(); // Replace with your base URL
@@ -26,13 +20,13 @@ class HomeController extends GetxController {
     fetchSubjects();
 
     // Listen for network changes
-    // _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
-    //   // Check if any of the results indicate an active internet connection
-    //   if (results.any((result) => result != ConnectivityResult.none)) {
-    //     // Internet is available, refresh the data
-    //     refreshSubjects();
-    //   }
-    // });
+    _connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      // Check if any of the results indicate an active internet connection
+      if (results.any((result) => result != ConnectivityResult.none)) {
+        // Internet is available, refresh the data
+        refreshSubjects();
+      }
+    });
   }
 
   // Fetch subjects from API
